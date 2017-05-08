@@ -33,7 +33,7 @@ void numerical_dynamics (void)
 	// TODO INSERT YOUR CODE HERE
 
 	double landerMass = UNLOADED_LANDER_MASS + fuel * FUEL_CAPACITY * FUEL_DENSITY;
-	double landerArea = pow(LANDER_SIZE/2.0, 2.0) * M_PI;
+	double landerArea = pow(LANDER_SIZE, 2.0) * M_PI;
 	double atmDensity = atmospheric_density(position);
 	vector3d totalFotrce = getGravity(position, landerMass, MARS_MASS) + getDrag(velocity, landerArea, atmDensity, DRAG_COEF_LANDER) + thrust_wrt_world();
 	if (parachute_status == DEPLOYED) {
@@ -46,7 +46,7 @@ void numerical_dynamics (void)
 	prevPosition = position;
 	position = nextPosition;
 
-	velocity = (position - prevPosition) / delta_t;
+	velocity = velocity + acceleration * delta_t;
 
 	// Here we can apply an autopilot to adjust the thrust, parachute and attitude
 	if (autopilot_enabled) autopilot();
