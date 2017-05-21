@@ -17,6 +17,7 @@
 
 vector3d getGravity(vector3d pos, double mass, double centreMass);
 vector3d getDrag(vector3d velocity, double area, double airDensity, double coeff);
+vector3d * getAreostatDetails();
 
 static vector3d prevPosition = position - velocity * delta_t;
 
@@ -24,13 +25,40 @@ void autopilot (void)
   // Autopilot to adjust the engine throttle, parachute and attitude control
 {
   // TODO INSERT YOUR CODE HERE
+
+	//stabilize attitude, opposite to velocity
+	attitude_stabilization(-velocity);
+	//version 1.
+	float height	= position.abs() - MARS_RADIUS;
+	float kh		= 0.045;
+	float gain		= 1;
+	float error		= 0;
+	float delta		= 0.5;
+	vector3d radUnit = position.norm();
+	if (parachute_status == DEPLOYED) {
+		delta = 0.2;
+		kh = 0.1;
+	}
+	error = -(0.2 + kh*height + radUnit * velocity);
+	if (height < EXOSPHERE/1.8) {
+		throttle = delta + gain * error; //the simulation program will take care of the min/max thing
+	} else {
+		throttle = 0;
+	}
+	//throttle = delta + gain * error; //the simulation program will take care of the min/max thing
+
+	//the parachute is useful after all
+	if (parachute_status == NOT_DEPLOYED && safe_to_deploy_parachute() && height < EXOSPHERE/2) {
+		parachute_status = DEPLOYED;
+	}
+
+
 }
 
 void numerical_dynamics (void)
   // This is the function that performs the numerical integration to update the
   // lander's pose. The time step is delta_t (global variable).
 {
-	// TODO INSERT YOUR CODE HERE
 
 	double landerMass = UNLOADED_LANDER_MASS + fuel * FUEL_CAPACITY * FUEL_DENSITY;
 	double landerArea = pow(LANDER_SIZE, 2.0) * M_PI;
@@ -152,6 +180,13 @@ void initialize_simulation (void)
     break;
 
   case 6:
+	  //areostationary orbit
+	  orientation = vector3d(0.0, 90.0, 0.0);
+	  delta_t = 0.1;
+	  prevPosition = position - velocity * delta_t;
+	  parachute_status = NOT_DEPLOYED;
+	  stabilized_attitude = true;
+	  autopilot_enabled = false;
     break;
 
   case 7:
@@ -181,4 +216,14 @@ vector3d getDrag(vector3d velocity, double area, double airDensity, double coeff
 	force *= area * airDensity * coeff;
 	force /= 2.0;
 	return force;
+}
+
+//TODO
+vector3d * getAreostatPos() {
+	vector3d posVel[3];
+	float orbitRad = orbitRad = pow(GRAVITY*MARS_MASS*pow(MARS_DAY, 2)/pow(2*M_PI, 2), 1/3);
+	posVel[0] = vector3d(orbitRad, 0.0, 0.0);
+	float speed = 2*M_PI*orbitRad/MARS_DAY;
+	posVel[1] = vector3d(0.0, -speed, 0.0);
+	return posVel;
 }

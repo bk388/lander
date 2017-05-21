@@ -1610,6 +1610,23 @@ void attitude_stabilization (void)
   orientation = matrix_to_xyz_euler(m);
 }
 
+void attitude_stabilization (vector3d upDirection) {
+	  vector3d up, left, out;
+	  double m[16];
+
+	  up = upDirection.norm();
+	  left.x = -up.y; left.y = up.x; left.z = 0.0;
+	  if (left.abs() < SMALL_NUM) {left.x = -up.z; left.y = 0.0; left.z = up.x;}
+	  left = left.norm();
+	  out = left^up;
+	  m[0] =	out.x;	m[1] =	out.y;	m[2] =	out.z;	m[3] =	0.0;
+	  m[4] =	left.x;	m[5] =	left.y;	m[6] =	left.z;	m[7] =	0.0;
+	  m[8] =	up.x;	m[9] =	up.y;	m[10] =	up.z;	m[11] =	0.0;
+	  m[12] =	0.0;	m[13] =	0.0;	m[14] =	0.0;	m[15] =	1.0;
+
+	  orientation = matrix_to_xyz_euler(m);
+}
+
 vector3d thrust_wrt_world (void)
   // Works out thrust vector in the world reference frame, given the lander's orientation
 {

@@ -237,6 +237,7 @@ void refresh_all_subwindows (void);
 bool safe_to_deploy_parachute (void);
 void update_visualization (void);
 void attitude_stabilization (void);
+void attitude_stabilization (vector3d upDirection);
 vector3d thrust_wrt_world (void);
 void autopilot (void);
 void numerical_dynamics (void);
