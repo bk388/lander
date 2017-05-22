@@ -255,4 +255,5 @@ void glut_key (unsigned char k, int x, int y);
 
 //TODO my functions
 void dotMat(double m0[], double m1[], double mout[]);
+void transpose(double m[], double mout[]);
 void rotateOrientation(double dPhi, vector3d axis);

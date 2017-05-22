@@ -22,16 +22,17 @@ static vector3d prevPosition = position - velocity * delta_t;
 static vector3d vertUnit;
 static vector3d prevOrientation;	//to introduce angular velocity of the spacecraft itself
 static vector3d nextOrientation;
-static double oMat[16];				//orientation matrix of the spacecraft
+/*static double oMat[16];				//orientation matrix of the spacecraft
 static double prevOMat[16];			//previous orientation matrix
 static double invPrevOMat[16];		//inverse of the previous orientation matrix
-static double nextOMat[16];			//next orientation matrix
+//static double nextOMat[16];			//next orientation matrix
 static double rotMat[16];			//rotation matrix
+static double rotMatT[16];
+static vector3d omega;*/
 
 void autopilot (void)
   // Autopilot to adjust the engine throttle, parachute and attitude control
 {
-  // TODO INSERT YOUR CODE HERE
 
 	//stabilize attitude, opposite to velocity
 	attitude_stabilization(-velocity);
@@ -58,6 +59,21 @@ void autopilot (void)
 	if (parachute_status == NOT_DEPLOYED && safe_to_deploy_parachute() && height < EXOSPHERE/2) {
 		parachute_status = DEPLOYED;
 	}
+
+	//orbital reentry: slow the spacecraft does not intersect with the exosphere
+	double orbitEnergy;
+	double coefB; //coefficient of the linear term in the quadratic equation whose solution is the min distance of the spacecraft from the centre of Mars
+	double constC; //constant term in the quadratic equation
+	double minRad; //min distance of the spacecraft from the centre of Mars
+	orbitEnergy = pow(velocity.abs(), 2.0)/2 - GRAVITY * MARS_MASS/position.abs();
+	coefB = GRAVITY * MARS_MASS / orbitEnergy;
+	constC = -(position ^ velocity).abs2()/(2*orbitEnergy);
+	minRad = coefB + pow(pow(coefB, 2) - 4*constC, 0.5);
+	minRad = -minRad/2;
+	if (minRad > MARS_RADIUS - EXOSPHERE) {
+		throttle = 0.5;
+	}
+
 }
 
 void numerical_dynamics (void)
@@ -84,9 +100,6 @@ void numerical_dynamics (void)
 
 	//the spacecraft has moment of inertia
 	//TODO does not work
-	/*nextOrientation = 2 * orientation - prevOrientation;
-	prevOrientation = orientation;
-	orientation = nextOrientation;*/
 	/*xyz_euler_to_matrix(orientation, oMat);
 	xyz_euler_to_matrix(prevOrientation, prevOMat);
 	invert(prevOMat, invPrevOMat);
@@ -94,6 +107,22 @@ void numerical_dynamics (void)
 	dotMat(rotMat, oMat, nextOMat);
 	prevOrientation = orientation;
 	orientation = matrix_to_xyz_euler(nextOMat);*/
+	/*xyz_euler_to_matrix(orientation, oMat);
+	xyz_euler_to_matrix(prevOrientation, prevOMat);
+	invert(prevOMat, invPrevOMat);
+	dotMat(oMat, invPrevOMat, rotMat);
+	double theta = acos((rotMat[0] + rotMat[5] + rotMat[10] - 1)/2);
+	transpose(rotMat, rotMatT);
+	for (int ii = 0; ii < 16; ii ++) {
+		rotMat[ii] -= rotMatT[ii];
+		rotMat[ii] *= theta;
+		rotMat[ii] /= sin(theta)*2*delta_t;
+	}
+	omega = vector3d(rotMat[6], rotMat[1], rotMat[12]);
+
+	if (omega.abs() > SMALL_NUM) {
+		rotateOrientation(omega.abs()*delta_t, omega.norm());
+	}*/
 
 	// Here we can apply an autopilot to adjust the thrust, parachute and attitude
 	if (autopilot_enabled) autopilot();
@@ -102,7 +131,11 @@ void numerical_dynamics (void)
 	//if (stabilized_attitude) attitude_stabilization();
 	vertUnit = position.norm();
 	if (stabilized_attitude) {
-		attitude_stabilization(vertUnit);
+		//attitude_stabilization(vertUnit);
+		double dPhi = -acos(position.norm()*prevPosition.norm());
+		vector3d axis = (position^prevPosition).norm();
+		rotateOrientation(dPhi, axis);
+
 	}
 }
 

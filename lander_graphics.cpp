@@ -92,6 +92,7 @@ void invert (double m[], double mout[])
 
 void dotMat(double m0[], double m1[], double mout[]) {
 	//calculates the matrix product of 4x4 OpenGL rotation matrices
+	//TODO
 	mout[0] = m0[0]*m1[0] + m0[4]*m1[1] + m0[8]*m1[2] + m0[12]*m1[3];
 	mout[1] = m0[1]*m1[0] + m0[5]*m1[1] + m0[9]*m1[2] + m0[13]*m1[3];
 	mout[2] = m0[2]*m1[0] + m0[6]*m1[1] + m0[10]*m1[2] + m0[14]*m1[3];
@@ -111,6 +112,14 @@ void dotMat(double m0[], double m1[], double mout[]) {
 	mout[13] = m0[1]*m1[12] + m0[5]*m1[13] + m0[9]*m1[14] + m0[13]*m1[15];
 	mout[14] = m0[2]*m1[12] + m0[6]*m1[13] + m0[10]*m1[14] + m0[14]*m1[15];
 	mout[15] = m0[3]*m1[12] + m0[7]*m1[13] + m0[11]*m1[14] + m0[15]*m1[15];
+}
+
+void transpose(double m[], double mout[]) {
+	for (int ii = 0; ii < 4; ii ++) {
+		for (int jj = 0; jj < 4; jj ++) {
+			mout[ii*4 + jj] = m[jj*4 + ii];
+		}
+	}
 }
 
 void xyz_euler_to_matrix (vector3d ang, double m[])
@@ -879,11 +888,17 @@ void display_help_text (void)
   glut_print(20, view_height-175, "s - toggle attitude stabilizer");
   glut_print(20, view_height-190, "p - deploy parachute");
   glut_print(20, view_height-205, "a - toggle autopilot");
+  glut_print(20, view_height-220, "d - orient spacecraft upwards");
 
-  glut_print(20, view_height-225, "l - toggle lighting model");
+  //TODO
+  /*glut_print(20, view_height-225, "l - toggle lighting model");
   glut_print(20, view_height-240, "t - toggle terrain texture");
   glut_print(20, view_height-255, "h - toggle help");
-  glut_print(20, view_height-270, "Esc/q - quit");
+  glut_print(20, view_height-270, "Esc/q - quit");*/
+	glut_print(20, view_height-240, "l - toggle lighting model");
+	glut_print(20, view_height-255, "t - toggle terrain texture");
+	glut_print(20, view_height-270, "h - toggle help");
+	glut_print(20, view_height-285, "Esc/q - quit");
 
   j = 0;
   for (i=0; i<10; i++) {
@@ -2192,11 +2207,25 @@ void glut_key (unsigned char k, int x, int y)
 	  }
 
 	  orientation = matrix_to_xyz_euler(oM1);*/
-	  rotateOrientation(dPhi, orbitPlane);
+	  if (!autopilot_enabled && !landed) {
+		  rotateOrientation(dPhi, orbitPlane);
+	  }
+	  if (paused) refresh_all_subwindows();
 	  break;
 
   case 'f': case 'F':
-	  rotateOrientation(-dPhi, orbitPlane);
+	  if (!autopilot_enabled && !landed) {
+		  rotateOrientation(-dPhi, orbitPlane);
+	  }
+	  if (paused) refresh_all_subwindows();
+	  break;
+
+  case 'd': case 'D':
+	  if (!autopilot_enabled && !landed) {
+		  stabilized_attitude = true;
+		  attitude_stabilization();
+	  }
+	  if (paused) refresh_all_subwindows();
 	  break;
 
   case 32:
@@ -2234,6 +2263,7 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 	xyz_euler_to_matrix(orientation, oM0);
 	cosOZ = rotAxis * zAxis;
 	sinOZ = (rotAxis ^ zAxis).abs();
+	rotAxis = rotAxis.norm();
 
 	if (sinOZ < SMALL_NUM && sinOZ > -SMALL_NUM) {
 	  rotM[0] = cos(dPhi);
