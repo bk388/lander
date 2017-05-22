@@ -17,9 +17,15 @@
 
 vector3d getGravity(vector3d pos, double mass, double centreMass);
 vector3d getDrag(vector3d velocity, double area, double airDensity, double coeff);
-vector3d * getAreostatDetails();
 
 static vector3d prevPosition = position - velocity * delta_t;
+static vector3d vertUnit;
+static vector3d prevOrientation;	//to introduce angular velocity of the spacecraft itself
+static double oMat[16];				//orientation matrix of the spacecraft
+static double prevOMat[16];			//previous orientation matrix
+static double invPrevOMat[16];		//inverse of the previous orientation matrix
+static double nextOMat[16];			//next orientation matrix
+static double rotMat[16];			//rotation matrix
 
 void autopilot (void)
   // Autopilot to adjust the engine throttle, parachute and attitude control
@@ -51,8 +57,6 @@ void autopilot (void)
 	if (parachute_status == NOT_DEPLOYED && safe_to_deploy_parachute() && height < EXOSPHERE/2) {
 		parachute_status = DEPLOYED;
 	}
-
-
 }
 
 void numerical_dynamics (void)
@@ -71,16 +75,34 @@ void numerical_dynamics (void)
 	vector3d acceleration = totalFotrce / landerMass;
 
 	vector3d nextPosition = 2.0 * position - prevPosition + acceleration * pow(delta_t, 2.0);
+
 	prevPosition = position;
 	position = nextPosition;
 
 	velocity = velocity + acceleration * delta_t;
 
+	//the spacecraft has moment of inertia
+	//TODO does not work
+	/*vector3d nextOrientation = 2 * orientation - prevOrientation;
+	prevOrientation = orientation;
+	orientation = nextOrientation;*/
+	xyz_euler_to_matrix(orientation, oMat);
+	xyz_euler_to_matrix(prevOrientation, prevOMat);
+	invert(prevOMat, invPrevOMat);
+	dotMat(oMat, invPrevOMat, rotMat);
+	dotMat(rotMat, oMat, nextOMat);
+	prevOrientation = orientation;
+	orientation = matrix_to_xyz_euler(nextOMat);
+
 	// Here we can apply an autopilot to adjust the thrust, parachute and attitude
 	if (autopilot_enabled) autopilot();
 
 	// Here we can apply 3-axis stabilization to ensure the base is always pointing downwards
-	if (stabilized_attitude) attitude_stabilization();
+	//if (stabilized_attitude) attitude_stabilization();
+	vertUnit = position.norm();
+	if (stabilized_attitude) {
+		attitude_stabilization(vertUnit);
+	}
 }
 
 void initialize_simulation (void)
@@ -100,7 +122,7 @@ void initialize_simulation (void)
   scenario_description[3] = "polar launch at escape velocity (but drag prevents escape)";
   scenario_description[4] = "elliptical orbit that clips the atmosphere and decays";
   scenario_description[5] = "descent from 200km";
-  scenario_description[6] = "";
+  scenario_description[6] = "areostationary orbit";
   scenario_description[7] = "";
   scenario_description[8] = "";
   scenario_description[9] = "";
@@ -112,6 +134,7 @@ void initialize_simulation (void)
     position = vector3d(1.2*MARS_RADIUS, 0.0, 0.0);
     velocity = vector3d(0.0, -3247.087385863725, 0.0);
     orientation = vector3d(0.0, 90.0, 0.0);
+    prevOrientation = orientation;
     delta_t = 0.1;
     prevPosition = position - velocity * delta_t;
     parachute_status = NOT_DEPLOYED;
@@ -124,6 +147,7 @@ void initialize_simulation (void)
     position = vector3d(0.0, -(MARS_RADIUS + 10000.0), 0.0);
     velocity = vector3d(0.0, 0.0, 0.0);
     orientation = vector3d(0.0, 0.0, 90.0);
+    prevOrientation = orientation;
     delta_t = 0.1;
     prevPosition = position - velocity * delta_t;
     parachute_status = NOT_DEPLOYED;
@@ -136,6 +160,7 @@ void initialize_simulation (void)
     position = vector3d(0.0, 0.0, 1.2*MARS_RADIUS);
     velocity = vector3d(3500.0, 0.0, 0.0);
     orientation = vector3d(0.0, 0.0, 90.0);
+    prevOrientation = orientation;
     delta_t = 0.1;
     prevPosition = position - velocity * delta_t;
     parachute_status = NOT_DEPLOYED;
@@ -148,6 +173,7 @@ void initialize_simulation (void)
     position = vector3d(0.0, 0.0, MARS_RADIUS + LANDER_SIZE/2.0);
     velocity = vector3d(0.0, 0.0, 5027.0);
     orientation = vector3d(0.0, 0.0, 0.0);
+    prevOrientation = orientation;
     delta_t = 0.1;
     prevPosition = position - velocity * delta_t;
     parachute_status = NOT_DEPLOYED;
@@ -160,6 +186,7 @@ void initialize_simulation (void)
     position = vector3d(0.0, 0.0, MARS_RADIUS + 100000.0);
     velocity = vector3d(4000.0, 0.0, 0.0);
     orientation = vector3d(0.0, 90.0, 0.0);
+    prevOrientation = orientation;
     delta_t = 0.1;
     prevPosition = position - velocity * delta_t;
     parachute_status = NOT_DEPLOYED;
@@ -172,6 +199,7 @@ void initialize_simulation (void)
     position = vector3d(0.0, -(MARS_RADIUS + EXOSPHERE), 0.0);
     velocity = vector3d(0.0, 0.0, 0.0);
     orientation = vector3d(0.0, 0.0, 90.0);
+    prevOrientation = orientation;
     delta_t = 0.1;
     prevPosition = position - velocity * delta_t;
     parachute_status = NOT_DEPLOYED;
@@ -181,7 +209,12 @@ void initialize_simulation (void)
 
   case 6:
 	  //areostationary orbit
+	  float orbitRad;
+	  orbitRad = pow(GRAVITY*MARS_MASS*pow(MARS_DAY, 2)/pow(2*M_PI, 2), (double)1/3);
+	  position = vector3d(orbitRad, 0.0, 0.0);
+	  velocity = vector3d(0.0, 2*M_PI*orbitRad/MARS_DAY, 0.0);
 	  orientation = vector3d(0.0, 90.0, 0.0);
+	    prevOrientation = orientation;
 	  delta_t = 0.1;
 	  prevPosition = position - velocity * delta_t;
 	  parachute_status = NOT_DEPLOYED;
@@ -216,14 +249,4 @@ vector3d getDrag(vector3d velocity, double area, double airDensity, double coeff
 	force *= area * airDensity * coeff;
 	force /= 2.0;
 	return force;
-}
-
-//TODO
-vector3d * getAreostatPos() {
-	vector3d posVel[3];
-	float orbitRad = orbitRad = pow(GRAVITY*MARS_MASS*pow(MARS_DAY, 2)/pow(2*M_PI, 2), 1/3);
-	posVel[0] = vector3d(orbitRad, 0.0, 0.0);
-	float speed = 2*M_PI*orbitRad/MARS_DAY;
-	posVel[1] = vector3d(0.0, -speed, 0.0);
-	return posVel;
 }

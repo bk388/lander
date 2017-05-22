@@ -90,6 +90,29 @@ void invert (double m[], double mout[])
   mout[15] = 1.0; mout[3] = 0.0; mout[7] = 0.0; mout[11] = 0.0;
 }
 
+void dotMat(double m0[], double m1[], double mout[]) {
+	//calculates the matrix product of 4x4 OpenGL rotation matrices
+	mout[0] = m0[0]*m1[0] + m0[4]*m1[1] + m0[8]*m1[2] + m0[12]*m1[3];
+	mout[1] = m0[1]*m1[0] + m0[5]*m1[1] + m0[9]*m1[2] + m0[13]*m1[3];
+	mout[2] = m0[2]*m1[0] + m0[6]*m1[1] + m0[10]*m1[2] + m0[14]*m1[3];
+	mout[3] = m0[3]*m1[0] + m0[7]*m1[1] + m0[11]*m1[2] + m0[15]*m1[3];
+
+	mout[4] = m0[0]*m1[4] + m0[4]*m1[5] + m0[8]*m1[6] + m0[12]*m1[7];
+	mout[5] = m0[1]*m1[4] + m0[5]*m1[5] + m0[9]*m1[6] + m0[13]*m1[7];
+	mout[6] = m0[2]*m1[4] + m0[6]*m1[5] + m0[10]*m1[6] + m0[14]*m1[7];
+	mout[7] = m0[3]*m1[4] + m0[7]*m1[5] + m0[11]*m1[6] + m0[15]*m1[7];
+
+	mout[8] = m0[0]*m1[8] + m0[4]*m1[9] + m0[8]*m1[10] + m0[12]*m1[11];
+	mout[9] = m0[1]*m1[8] + m0[5]*m1[9] + m0[9]*m1[10] + m0[13]*m1[11];
+	mout[10] = m0[2]*m1[8] + m0[6]*m1[9] + m0[10]*m1[10] + m0[14]*m1[11];
+	mout[11] = m0[3]*m1[8] + m0[7]*m1[9] + m0[11]*m1[10] + m0[15]*m1[11];
+
+	mout[12] = m0[0]*m1[12] + m0[4]*m1[13] + m0[8]*m1[14] + m0[12]*m1[15];
+	mout[13] = m0[1]*m1[12] + m0[5]*m1[13] + m0[9]*m1[14] + m0[13]*m1[15];
+	mout[14] = m0[2]*m1[12] + m0[6]*m1[13] + m0[10]*m1[14] + m0[14]*m1[15];
+	mout[15] = m0[3]*m1[12] + m0[7]*m1[13] + m0[11]*m1[14] + m0[15]*m1[15];
+}
+
 void xyz_euler_to_matrix (vector3d ang, double m[])
   // Constructs a 4x4 OpenGL rotation matrix from xyz Euler angles
 {
@@ -1951,6 +1974,7 @@ void glut_special (int key, int x, int y)
 void glut_key (unsigned char k, int x, int y)
   // Callback for key presses in all windows
 {
+	  double dPhi;
   switch(k) {
     
   case 27: case 'q': case 'Q':
@@ -2064,6 +2088,17 @@ void glut_key (unsigned char k, int x, int y)
     if (!autopilot_enabled && !landed) stabilized_attitude = !stabilized_attitude;
     if (paused) refresh_all_subwindows();
     break;
+
+    //TODO does not work (hopefully yet)
+  case 'r': case 'R':
+	  dPhi = 0.5; //unit angular rotation
+	  orientation.x += dPhi;
+	  break;
+
+  case 'f': case 'F':
+	  dPhi = 0.5; //unit angular rotation
+	  orientation.x -= dPhi;
+	  break;
 
   case 32:
     // space bar

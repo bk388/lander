@@ -206,6 +206,7 @@ void xyz_euler_to_matrix (vector3d ang, double m[]);
 vector3d matrix_to_xyz_euler (double m[]);
 void normalize_quat (quat_t &q);
 quat_t axis_to_quat (vector3d a, const double phi);
+void dotMat(double m0[], double m1[], double mout[]); //TODO
 double project_to_sphere (const double r, const double x, const double y);
 quat_t add_quats (quat_t q1, quat_t q2);
 void quat_to_matrix (double m[], const quat_t q);
