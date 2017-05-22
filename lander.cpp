@@ -70,8 +70,12 @@ void autopilot (void)
 	constC = -(position ^ velocity).abs2()/(2*orbitEnergy);
 	minRad = coefB + pow(pow(coefB, 2) - 4*constC, 0.5);
 	minRad = -minRad/2;
-	if (minRad > MARS_RADIUS - EXOSPHERE) {
-		throttle = 0.5;
+	/*const double rad1 = coefB + pow(pow(coefB, 2) - 4*constC, 0.5);
+	const double rad2 = coefB - pow(pow(coefB, 2) - 4*constC, 0.5);*
+	printf("%f, %f\n", minRad, );*/
+	if (minRad > MARS_RADIUS) { //it could be MARS_RADIUS + const*EXOSPHERE, but it would need negligibly less fuel and would take much more time
+		throttle = 1;
+		//throttle = (minRad - MARS_RADIUS)*0.00000002;
 	}
 
 }
