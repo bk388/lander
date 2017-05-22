@@ -1975,6 +1975,38 @@ void glut_key (unsigned char k, int x, int y)
   // Callback for key presses in all windows
 {
 	  double dPhi;
+	  /*double oM0[16];
+	  double oM1[16];
+	  double mat0[16];
+	  double rotM[16];
+	  double sinOZ;
+	  double cosOZ;
+	  double sinA;
+	  double cosA;
+	  double sinB;
+	  double cosB;
+	  vector3d zAxis = vector3d(0.0, 0.0, 1.0);
+	  vector3d zxPlane = vector3d(0.0, 1.0, 0.0);
+	  vector3d ozPlane;
+	  dPhi = 0.5; //unit angular rotation (in degrees)
+	  for (int ii = 0; ii < 16; ii ++) {
+		  oM0[ii] = 0;
+		  oM1[ii] = 0;
+		  rotM[ii] = 0;
+		  mat0[16] = 0;
+	  }*/
+	  vector3d orbitPlane;
+	  dPhi = M_PI*simulation_speed/180; //unit angular rotation
+	  orbitPlane = position^velocity;
+	  if (orbitPlane.abs() < SMALL_NUM) {
+		  if ((velocity^vector3d(0.0, 1.0, 0.0)).abs() < SMALL_NUM) {
+			  orbitPlane = vector3d(0.0, 1.0, 0.0);
+		  } else {
+			  orbitPlane = velocity ^ vector3d(0.0, 1.0, 0.0);
+		  }
+	  } else {
+		  orbitPlane = orbitPlane.norm();
+	  }
   switch(k) {
     
   case 27: case 'q': case 'Q':
@@ -2089,15 +2121,82 @@ void glut_key (unsigned char k, int x, int y)
     if (paused) refresh_all_subwindows();
     break;
 
-    //TODO does not work (hopefully yet)
+    //TODO
   case 'r': case 'R':
-	  dPhi = 0.5; //unit angular rotation
-	  orientation.x += dPhi;
+	  //printf("%f; %f; %f\n", orbitPlane.x, orbitPlane.y, orbitPlane.z);
+	  /*xyz_euler_to_matrix(orientation, oM0);
+	  cosOZ = orbitPlane * zAxis;
+	  sinOZ = (orbitPlane ^ zAxis).abs();
+	  printf("%f; %f\n", cosOZ, sinOZ);
+	  if (sinOZ < SMALL_NUM && sinOZ > -SMALL_NUM) {
+		  rotM[0] = cos(dPhi);
+		  rotM[1] = sin(dPhi);
+		  rotM[4] = -sin(dPhi);
+		  rotM[5] = cos(dPhi);
+		  rotM[10] = 1.0;
+		  rotM[15] = 1.0;
+		  dotMat(rotM, oM0, oM1);
+		  for (int ii = 0; ii < 16; ii ++) {
+			  rotM[ii] = 0.0;
+		  }
+	  } else {
+		  ozPlane = (zAxis ^ orbitPlane).norm();
+		  cosA = ozPlane * zxPlane;
+		  sinA = (ozPlane ^ zxPlane).abs();
+		  //rotate the orbit plane vector into the zx plane
+		  rotM[0] = cosA;
+		  rotM[1] = sinA;
+		  rotM[4] = -sinA;
+		  rotM[5] = cosA;
+		  rotM[10] = 1.0;
+		  rotM[15] = 1.0;
+		  dotMat(rotM, oM0, oM1);
+		  //rotate the orbit plane vector to the z axis
+		  rotM[0] = cosOZ;
+		  rotM[1] = 0.0;
+		  rotM[2] = -sinOZ;
+		  rotM[4] = 0.0;
+		  rotM[5] = 1.0;
+		  rotM[8] = sinOZ;
+		  rotM[10] = cosOZ;
+		  dotMat(rotM, oM1, oM0);
+		  //apply the rotation
+		  rotM[0] = cos(dPhi);
+		  rotM[1] = sin(dPhi);
+		  rotM[2] = 0.0;
+		  rotM[4] = -sin(dPhi);
+		  rotM[5] = cos(dPhi);
+		  rotM[8] = 0.0;
+		  rotM[10] = 1.0;
+		  dotMat(rotM, oM0, oM1);
+		  //undo the transformation of the orbit plane
+		  rotM[0] = cosOZ;
+		  rotM[1] = 0.0;
+		  rotM[2] = sinOZ;
+		  rotM[4] = 0.0;
+		  rotM[5] = 1.0;
+		  rotM[8] = -sinOZ;
+		  rotM[10] = cosOZ;
+		  dotMat(rotM, oM1, oM0);
+
+		  rotM[0] = cosA;
+		  rotM[1] = -sinA;
+		  rotM[2] = 0.0;
+		  rotM[4] = sinA;
+		  rotM[5] = cosA;
+		  rotM[8] = 0.0;
+		  rotM[10] = 1.0;
+		  rotM[15] = 1.0;
+		  dotMat(rotM, oM0, oM1);
+
+	  }
+
+	  orientation = matrix_to_xyz_euler(oM1);*/
+	  rotateOrientation(dPhi, orbitPlane);
 	  break;
 
   case 'f': case 'F':
-	  dPhi = 0.5; //unit angular rotation
-	  orientation.x -= dPhi;
+	  rotateOrientation(-dPhi, orbitPlane);
 	  break;
 
   case 32:
@@ -2110,6 +2209,96 @@ void glut_key (unsigned char k, int x, int y)
     break;
 
   }
+}
+
+void rotateOrientation(double dPhi, vector3d rotAxis) {
+	//TODO
+
+	//source: http://inside.mines.edu/fs_home/gmurray/ArbitraryAxisRotation/
+	double oM0[16];
+	double oM1[16];
+	double rotM[16];
+	double sinOZ;
+	double cosOZ;
+	double sinA;
+	double cosA;
+	vector3d zAxis = vector3d(0.0, 0.0, 1.0);
+	vector3d zxPlane = vector3d(0.0, 1.0, 0.0);
+	vector3d azPlane; //the plane defined by the axis of rotation and the z axis
+	for (int ii = 0; ii < 16; ii ++) {
+	  oM0[ii] = 0;
+	  oM1[ii] = 0;
+	  rotM[ii] = 0;
+	}
+
+	xyz_euler_to_matrix(orientation, oM0);
+	cosOZ = rotAxis * zAxis;
+	sinOZ = (rotAxis ^ zAxis).abs();
+
+	if (sinOZ < SMALL_NUM && sinOZ > -SMALL_NUM) {
+	  rotM[0] = cos(dPhi);
+	  rotM[1] = sin(dPhi);
+	  rotM[4] = -sin(dPhi);
+	  rotM[5] = cos(dPhi);
+	  rotM[10] = 1.0;
+	  rotM[15] = 1.0;
+	  dotMat(rotM, oM0, oM1);
+	  for (int ii = 0; ii < 16; ii ++) {
+		  rotM[ii] = 0.0;
+	  }
+	} else {
+	  azPlane = (zAxis ^ rotAxis).norm();
+	  cosA = azPlane * zxPlane;
+	  sinA = (azPlane ^ zxPlane).abs();
+	  //rotate the orbit plane vector into the zx plane
+	  rotM[0] = cosA;
+	  rotM[1] = sinA;
+	  rotM[4] = -sinA;
+	  rotM[5] = cosA;
+	  rotM[10] = 1.0;
+	  rotM[15] = 1.0;
+	  dotMat(rotM, oM0, oM1);
+	  //rotate the orbit plane vector to the z axis
+	  rotM[0] = cosOZ;
+	  rotM[1] = 0.0;
+	  rotM[2] = -sinOZ;
+	  rotM[4] = 0.0;
+	  rotM[5] = 1.0;
+	  rotM[8] = sinOZ;
+	  rotM[10] = cosOZ;
+	  dotMat(rotM, oM1, oM0);
+	  //apply the rotation
+	  rotM[0] = cos(dPhi);
+	  rotM[1] = sin(dPhi);
+	  rotM[2] = 0.0;
+	  rotM[4] = -sin(dPhi);
+	  rotM[5] = cos(dPhi);
+	  rotM[8] = 0.0;
+	  rotM[10] = 1.0;
+	  dotMat(rotM, oM0, oM1);
+	  //undo the transformation of the orbit plane
+	  rotM[0] = cosOZ;
+	  rotM[1] = 0.0;
+	  rotM[2] = sinOZ;
+	  rotM[4] = 0.0;
+	  rotM[5] = 1.0;
+	  rotM[8] = -sinOZ;
+	  rotM[10] = cosOZ;
+	  dotMat(rotM, oM1, oM0);
+
+	  rotM[0] = cosA;
+	  rotM[1] = -sinA;
+	  rotM[2] = 0.0;
+	  rotM[4] = sinA;
+	  rotM[5] = cosA;
+	  rotM[8] = 0.0;
+	  rotM[10] = 1.0;
+	  rotM[15] = 1.0;
+	  dotMat(rotM, oM0, oM1);
+
+	}
+
+	orientation = matrix_to_xyz_euler(oM1);
 }
 
 int main (int argc, char* argv[])

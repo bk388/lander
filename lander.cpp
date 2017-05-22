@@ -21,6 +21,7 @@ vector3d getDrag(vector3d velocity, double area, double airDensity, double coeff
 static vector3d prevPosition = position - velocity * delta_t;
 static vector3d vertUnit;
 static vector3d prevOrientation;	//to introduce angular velocity of the spacecraft itself
+static vector3d nextOrientation;
 static double oMat[16];				//orientation matrix of the spacecraft
 static double prevOMat[16];			//previous orientation matrix
 static double invPrevOMat[16];		//inverse of the previous orientation matrix
@@ -83,16 +84,16 @@ void numerical_dynamics (void)
 
 	//the spacecraft has moment of inertia
 	//TODO does not work
-	/*vector3d nextOrientation = 2 * orientation - prevOrientation;
+	/*nextOrientation = 2 * orientation - prevOrientation;
 	prevOrientation = orientation;
 	orientation = nextOrientation;*/
-	xyz_euler_to_matrix(orientation, oMat);
+	/*xyz_euler_to_matrix(orientation, oMat);
 	xyz_euler_to_matrix(prevOrientation, prevOMat);
 	invert(prevOMat, invPrevOMat);
 	dotMat(oMat, invPrevOMat, rotMat);
 	dotMat(rotMat, oMat, nextOMat);
 	prevOrientation = orientation;
-	orientation = matrix_to_xyz_euler(nextOMat);
+	orientation = matrix_to_xyz_euler(nextOMat);*/
 
 	// Here we can apply an autopilot to adjust the thrust, parachute and attitude
 	if (autopilot_enabled) autopilot();
@@ -218,7 +219,7 @@ void initialize_simulation (void)
 	  delta_t = 0.1;
 	  prevPosition = position - velocity * delta_t;
 	  parachute_status = NOT_DEPLOYED;
-	  stabilized_attitude = true;
+	  stabilized_attitude = false;
 	  autopilot_enabled = false;
     break;
 
