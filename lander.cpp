@@ -135,6 +135,7 @@ void numerical_dynamics (void)
 	if (orientLocked) {
 		vector3d axis = -(position^prevPosition).norm();
 		double dPhi = acos(position.norm()*prevPosition.norm());
+		//printf("%f, %f, %f; %f\n", axis.x, axis.y, axis.z, dPhi);
 		rotateOrientation(dPhi, axis);
 	}
 }
@@ -168,8 +169,10 @@ void initialize_simulation (void)
   case 0:
     // a circular equatorial orbit
     position = vector3d(1.2*MARS_RADIUS, 0.0, 0.0);
+	//position = vector3d(0.0, 0.0, 1.2*MARS_RADIUS);
     velocity = vector3d(0.0, -3247.087385863725, 0.0);
     orientation = vector3d(0.0, 90.0, 0.0);
+    //orientation = vector3d(0.0, 0.0, 0.0);
     prevOrientation = orientation;
     delta_t = 0.1;
     prevPosition = position - velocity * delta_t;

@@ -2213,54 +2213,56 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 		  rotM[ii] = 0.0;
 	  }
 	} else {
-	  azPlane = (zAxis ^ rotAxis).norm();
-	  cosA = azPlane * zxPlane;
-	  sinA = (azPlane ^ zxPlane).abs();
-	  //rotate the orbit plane vector into the zx plane
-	  rotM[0] = cosA;
-	  rotM[1] = sinA;
-	  rotM[4] = -sinA;
-	  rotM[5] = cosA;
-	  rotM[10] = 1.0;
-	  rotM[15] = 1.0;
-	  dotMat(rotM, oM0, oM1);
-	  //rotate the orbit plane vector to the z axis
-	  rotM[0] = cosOZ;
-	  rotM[1] = 0.0;
-	  rotM[2] = -sinOZ;
-	  rotM[4] = 0.0;
-	  rotM[5] = 1.0;
-	  rotM[8] = sinOZ;
-	  rotM[10] = cosOZ;
-	  dotMat(rotM, oM1, oM0);
-	  //apply the rotation
-	  rotM[0] = cos(dPhi);
-	  rotM[1] = sin(dPhi);
-	  rotM[2] = 0.0;
-	  rotM[4] = -sin(dPhi);
-	  rotM[5] = cos(dPhi);
-	  rotM[8] = 0.0;
-	  rotM[10] = 1.0;
-	  dotMat(rotM, oM0, oM1);
-	  //undo the transformation of the orbit plane
-	  rotM[0] = cosOZ;
-	  rotM[1] = 0.0;
-	  rotM[2] = sinOZ;
-	  rotM[4] = 0.0;
-	  rotM[5] = 1.0;
-	  rotM[8] = -sinOZ;
-	  rotM[10] = cosOZ;
-	  dotMat(rotM, oM1, oM0);
+		azPlane = (zAxis ^ rotAxis).norm();
+		sinOZ = -(zAxis ^ rotAxis) * azPlane;
+		cosA = azPlane * zxPlane;
+		//sinA = (azPlane ^ zxPlane).abs();
+		sinA = (azPlane ^ zxPlane)*zAxis;
+		//rotate the orbit plane vector into the zx plane
+		rotM[0] = cosA;
+		rotM[1] = sinA;
+		rotM[4] = -sinA;
+		rotM[5] = cosA;
+		rotM[10] = 1.0;
+		rotM[15] = 1.0;
+		dotMat(rotM, oM0, oM1);
+		//rotate the orbit plane vector to the z axis
+		rotM[0] = cosOZ;
+		rotM[1] = 0.0;
+		rotM[2] = -sinOZ;
+		rotM[4] = 0.0;
+		rotM[5] = 1.0;
+		rotM[8] = sinOZ;
+		rotM[10] = cosOZ;
+		dotMat(rotM, oM1, oM0);
+		//apply the rotation
+		rotM[0] = cos(dPhi);
+		rotM[1] = sin(dPhi);
+		rotM[2] = 0.0;
+		rotM[4] = -sin(dPhi);
+		rotM[5] = cos(dPhi);
+		rotM[8] = 0.0;
+		rotM[10] = 1.0;
+		dotMat(rotM, oM0, oM1);
+		//undo the transformation of the orbit plane
+		rotM[0] = cosOZ;
+		rotM[1] = 0.0;
+		rotM[2] = sinOZ;
+		rotM[4] = 0.0;
+		rotM[5] = 1.0;
+		rotM[8] = -sinOZ;
+		rotM[10] = cosOZ;
+		dotMat(rotM, oM1, oM0);
 
-	  rotM[0] = cosA;
-	  rotM[1] = -sinA;
-	  rotM[2] = 0.0;
-	  rotM[4] = sinA;
-	  rotM[5] = cosA;
-	  rotM[8] = 0.0;
-	  rotM[10] = 1.0;
-	  rotM[15] = 1.0;
-	  dotMat(rotM, oM0, oM1);
+		rotM[0] = cosA;
+		rotM[1] = -sinA;
+		rotM[2] = 0.0;
+		rotM[4] = sinA;
+		rotM[5] = cosA;
+		rotM[8] = 0.0;
+		rotM[10] = 1.0;
+		rotM[15] = 1.0;
+		dotMat(rotM, oM0, oM1);
 
 	}
 
