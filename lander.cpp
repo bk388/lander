@@ -70,12 +70,8 @@ void autopilot (void)
 	constC = -(position ^ velocity).abs2()/(2*orbitEnergy);
 	minRad = coefB + pow(pow(coefB, 2) - 4*constC, 0.5);
 	minRad = -minRad/2;
-	/*const double rad1 = coefB + pow(pow(coefB, 2) - 4*constC, 0.5);
-	const double rad2 = coefB - pow(pow(coefB, 2) - 4*constC, 0.5);*
-	printf("%f, %f\n", minRad, );*/
 	if (minRad > MARS_RADIUS) { //it could be MARS_RADIUS + const*EXOSPHERE, but it would need negligibly less fuel and would take much more time
 		throttle = 1;
-		//throttle = (minRad - MARS_RADIUS)*0.00000002;
 	}
 
 }
@@ -133,13 +129,13 @@ void numerical_dynamics (void)
 
 	// Here we can apply 3-axis stabilization to ensure the base is always pointing downwards
 	//if (stabilized_attitude) attitude_stabilization();
-	vertUnit = position.norm();
 	if (stabilized_attitude) {
-		//attitude_stabilization(vertUnit);
-		double dPhi = -acos(position.norm()*prevPosition.norm());
-		vector3d axis = (position^prevPosition).norm();
+		attitude_stabilization();
+	}
+	if (orientLocked) {
+		vector3d axis = -(position^prevPosition).norm();
+		double dPhi = acos(position.norm()*prevPosition.norm());
 		rotateOrientation(dPhi, axis);
-
 	}
 }
 
@@ -164,6 +160,8 @@ void initialize_simulation (void)
   scenario_description[7] = "";
   scenario_description[8] = "";
   scenario_description[9] = "";
+
+  orientLocked = false;
 
   switch (scenario) {
 

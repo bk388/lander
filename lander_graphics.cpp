@@ -888,7 +888,7 @@ void display_help_text (void)
   glut_print(20, view_height-175, "s - toggle attitude stabilizer");
   glut_print(20, view_height-190, "p - deploy parachute");
   glut_print(20, view_height-205, "a - toggle autopilot");
-  glut_print(20, view_height-220, "d - orient spacecraft upwards");
+  glut_print(20, view_height-220, "o - lock spacecraft relative orientation");
 
   //TODO
   /*glut_print(20, view_height-225, "l - toggle lighting model");
@@ -905,7 +905,7 @@ void display_help_text (void)
     s.str("");
     s << "Scenario " << i << ": " << scenario_description[i];
     if (view_height > 448) glut_print(20, (448-view_height) + view_height-300-15*j, s.str());
-    else glut_print(20, view_height-300-15*j, s.str());
+    else glut_print(20, view_height-310-15*j, s.str());
     j++;
   }
 
@@ -2012,12 +2012,11 @@ void glut_key (unsigned char k, int x, int y)
 	  }*/
 	  vector3d orbitPlane;
 	  dPhi = M_PI*simulation_speed/180; //unit angular rotation
-	  orbitPlane = position^velocity;
+	  orbitPlane = -(position^velocity);
 	  if (orbitPlane.abs() < SMALL_NUM) {
-		  if ((velocity^vector3d(0.0, 1.0, 0.0)).abs() < SMALL_NUM) {
-			  orbitPlane = vector3d(0.0, 1.0, 0.0);
-		  } else {
-			  orbitPlane = velocity ^ vector3d(0.0, 1.0, 0.0);
+		  orbitPlane = (velocity ^ vector3d(velocity.x, velocity.z, -velocity.y)).norm();
+		  if(orbitPlane.abs() < SMALL_NUM) {
+			  orbitPlane = (velocity ^ vector3d(velocity.z, velocity.y, -velocity.x)).norm();
 		  }
 	  } else {
 		  orbitPlane = orbitPlane.norm();
@@ -2091,7 +2090,13 @@ void glut_key (unsigned char k, int x, int y)
 
   case 'a': case 'A':
     // a or A - autopilot
-    if (!landed) autopilot_enabled = !autopilot_enabled;
+    if (!landed) {
+    	autopilot_enabled = !autopilot_enabled;
+    	if (autopilot_enabled) {
+    		stabilized_attitude = false;
+    		orientLocked = false;
+    	}
+    }
     if (paused) refresh_all_subwindows();
     break;
 
@@ -2139,74 +2144,6 @@ void glut_key (unsigned char k, int x, int y)
     //TODO
   case 'r': case 'R':
 	  //printf("%f; %f; %f\n", orbitPlane.x, orbitPlane.y, orbitPlane.z);
-	  /*xyz_euler_to_matrix(orientation, oM0);
-	  cosOZ = orbitPlane * zAxis;
-	  sinOZ = (orbitPlane ^ zAxis).abs();
-	  printf("%f; %f\n", cosOZ, sinOZ);
-	  if (sinOZ < SMALL_NUM && sinOZ > -SMALL_NUM) {
-		  rotM[0] = cos(dPhi);
-		  rotM[1] = sin(dPhi);
-		  rotM[4] = -sin(dPhi);
-		  rotM[5] = cos(dPhi);
-		  rotM[10] = 1.0;
-		  rotM[15] = 1.0;
-		  dotMat(rotM, oM0, oM1);
-		  for (int ii = 0; ii < 16; ii ++) {
-			  rotM[ii] = 0.0;
-		  }
-	  } else {
-		  ozPlane = (zAxis ^ orbitPlane).norm();
-		  cosA = ozPlane * zxPlane;
-		  sinA = (ozPlane ^ zxPlane).abs();
-		  //rotate the orbit plane vector into the zx plane
-		  rotM[0] = cosA;
-		  rotM[1] = sinA;
-		  rotM[4] = -sinA;
-		  rotM[5] = cosA;
-		  rotM[10] = 1.0;
-		  rotM[15] = 1.0;
-		  dotMat(rotM, oM0, oM1);
-		  //rotate the orbit plane vector to the z axis
-		  rotM[0] = cosOZ;
-		  rotM[1] = 0.0;
-		  rotM[2] = -sinOZ;
-		  rotM[4] = 0.0;
-		  rotM[5] = 1.0;
-		  rotM[8] = sinOZ;
-		  rotM[10] = cosOZ;
-		  dotMat(rotM, oM1, oM0);
-		  //apply the rotation
-		  rotM[0] = cos(dPhi);
-		  rotM[1] = sin(dPhi);
-		  rotM[2] = 0.0;
-		  rotM[4] = -sin(dPhi);
-		  rotM[5] = cos(dPhi);
-		  rotM[8] = 0.0;
-		  rotM[10] = 1.0;
-		  dotMat(rotM, oM0, oM1);
-		  //undo the transformation of the orbit plane
-		  rotM[0] = cosOZ;
-		  rotM[1] = 0.0;
-		  rotM[2] = sinOZ;
-		  rotM[4] = 0.0;
-		  rotM[5] = 1.0;
-		  rotM[8] = -sinOZ;
-		  rotM[10] = cosOZ;
-		  dotMat(rotM, oM1, oM0);
-
-		  rotM[0] = cosA;
-		  rotM[1] = -sinA;
-		  rotM[2] = 0.0;
-		  rotM[4] = sinA;
-		  rotM[5] = cosA;
-		  rotM[8] = 0.0;
-		  rotM[10] = 1.0;
-		  rotM[15] = 1.0;
-		  dotMat(rotM, oM0, oM1);
-
-	  }
-
-	  orientation = matrix_to_xyz_euler(oM1);*/
 	  if (!autopilot_enabled && !landed) {
 		  rotateOrientation(dPhi, orbitPlane);
 	  }
@@ -2220,10 +2157,9 @@ void glut_key (unsigned char k, int x, int y)
 	  if (paused) refresh_all_subwindows();
 	  break;
 
-  case 'd': case 'D':
+  case 'o': case 'O':
 	  if (!autopilot_enabled && !landed) {
-		  stabilized_attitude = true;
-		  attitude_stabilization();
+		  orientLocked = !orientLocked;
 	  }
 	  if (paused) refresh_all_subwindows();
 	  break;
@@ -2267,8 +2203,8 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 
 	if (sinOZ < SMALL_NUM && sinOZ > -SMALL_NUM) {
 	  rotM[0] = cos(dPhi);
-	  rotM[1] = sin(dPhi);
-	  rotM[4] = -sin(dPhi);
+	  rotM[1] = sin(dPhi)*(zAxis*rotAxis);
+	  rotM[4] = -sin(dPhi)*(zAxis*rotAxis);
 	  rotM[5] = cos(dPhi);
 	  rotM[10] = 1.0;
 	  rotM[15] = 1.0;
