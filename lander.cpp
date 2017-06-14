@@ -15,8 +15,38 @@
 #include "lander.h"
 #include <math.h>
 
+enum pilotMode { DESCENT = 0, LAUNCH = 1 };
+pilotMode mode;
+
+//orbit parameters
+vector3d targetPlane;
+double minRadius;
+double maxRadius;
+
+//control constants for orbital injection
+const double vn0 = -1.0;
+const double vtg0 = 1;
+const double vr0 = 1;
+const double vtgSlope = 1;
+const double vrSlope = 1;
+const double kn = 1;
+const double kr = 1;
+const double ktg = 1;
+//control variables
+/*double vn;
+double vtg;
+double vr;
+double vnTarget;
+double vtgTarget;
+double vrTarget;*/
+double vmax;
+vector3d thrustVect;
+vector3d rPos;
+vector3d nPos;
+
 vector3d getGravity(vector3d pos, double mass, double centreMass);
 vector3d getDrag(vector3d velocity, double area, double airDensity, double coeff);
+double landerMass;
 
 static vector3d prevPosition = position - velocity * delta_t;
 static vector3d vertUnit;
@@ -34,44 +64,60 @@ void autopilot (void)
   // Autopilot to adjust the engine throttle, parachute and attitude control
 {
 
-	//stabilize attitude, opposite to velocity
-	attitude_stabilization(-velocity);
-	//version 1.
-	float height	= position.abs() - MARS_RADIUS;
-	float kh		= 0.045;
-	float gain		= 1;
-	float error		= 0;
-	float delta		= 0.5;
-	vector3d radUnit = position.norm();
-	if (parachute_status == DEPLOYED) {
-		delta = 0.2;
-		kh = 0.1;
-	}
-	error = -(0.2 + kh*height + radUnit * velocity);
-	if (height < EXOSPHERE/1.8) {
-		throttle = delta + gain * error; //the simulation program will take care of the min/max thing
-	} else {
-		throttle = 0;
-	}
-	//throttle = delta + gain * error; //the simulation program will take care of the min/max thing
+	if (mode == DESCENT) {
+		//stabilize attitude, opposite to velocity
+		attitude_stabilization(-velocity);
+		//version 1.
+		float height	= position.abs() - MARS_RADIUS;
+		float kh		= 0.045;
+		float gain		= 1;
+		float error		= 0;
+		float delta		= 0.5;
+		vector3d radUnit = position.norm();
+		if (parachute_status == DEPLOYED) {
+			delta = 0.2;
+			kh = 0.1;
+		}
+		error = -(0.2 + kh*height + radUnit * velocity);
+		if (height < EXOSPHERE/1.8) {
+			throttle = delta + gain * error; //the simulation program will take care of the min/max thing
+		} else {
+			throttle = 0;
+		}
+		//throttle = delta + gain * error; //the simulation program will take care of the min/max thing
 
-	//the parachute is useful after all
-	if (parachute_status == NOT_DEPLOYED && safe_to_deploy_parachute() && height < EXOSPHERE/2) {
-		parachute_status = DEPLOYED;
-	}
+		//the parachute is useful after all
+		if (parachute_status == NOT_DEPLOYED && safe_to_deploy_parachute() && height < EXOSPHERE/2) {
+			//would-be acceleration:
+			parachute_status = DEPLOYED;
+		}
 
-	//orbital reentry: slow the spacecraft does not intersect with the exosphere
-	double orbitEnergy;
-	double coefB; //coefficient of the linear term in the quadratic equation whose solution is the min distance of the spacecraft from the centre of Mars
-	double constC; //constant term in the quadratic equation
-	double minRad; //min distance of the spacecraft from the centre of Mars
-	orbitEnergy = pow(velocity.abs(), 2.0)/2 - GRAVITY * MARS_MASS/position.abs();
-	coefB = GRAVITY * MARS_MASS / orbitEnergy;
-	constC = -(position ^ velocity).abs2()/(2*orbitEnergy);
-	minRad = coefB + pow(pow(coefB, 2) - 4*constC, 0.5);
-	minRad = -minRad/2;
-	if (minRad > MARS_RADIUS) { //it could be MARS_RADIUS + const*EXOSPHERE, but it would need negligibly less fuel and would take much more time
-		throttle = 1;
+		//orbital reentry: slow the spacecraft does not intersect with the exosphere
+		double orbitEnergy;
+		double coefB; //coefficient of the linear term in the quadratic equation whose solution is the min distance of the spacecraft from the centre of Mars
+		double constC; //constant term in the quadratic equation
+		double minRad; //min distance of the spacecraft from the centre of Mars
+		orbitEnergy = pow(velocity.abs(), 2.0)/2 - GRAVITY * MARS_MASS/position.abs();
+		coefB = GRAVITY * MARS_MASS / orbitEnergy;
+		constC = -(position ^ velocity).abs2()/(2*orbitEnergy);
+		minRad = coefB + pow(pow(coefB, 2) - 4*constC, 0.5);
+		minRad = -minRad/2;
+		if (minRad > MARS_RADIUS) { //it could be MARS_RADIUS + const*EXOSPHERE, but it would need negligibly less fuel and would take much more time
+			throttle = 1;
+		}
+	} else if (mode == LAUNCH) {
+		landerMass = UNLOADED_LANDER_MASS + fuel * FUEL_CAPACITY * FUEL_DENSITY;
+		rPos = (targetPlane ^ position) ^ targetPlane; // component of the position in the orbit plane
+		nPos = (targetPlane * position) * targetPlane; // component of the position normal to the orbit plane (distance from orbit plane)
+
+		//calculating the max velocity from the orbit parameters
+		vmax = 2.0*GRAVITY*MARS_MASS*maxRadius/(minRadius*(minRadius + maxRadius));
+
+		thrustVect = targetPlane*kn * ( nPos.abs()*vn0 - (targetPlane*velocity) ) //normal component of thrust
+					+ kr * ((minRadius*rPos.norm() - rPos)*vr0 - (rPos.norm()*velocity)*rPos.norm()) //radial component of thrust
+					+ ktg*(targetPlane ^ rPos).norm() * ( (vmax - velocity*(targetPlane ^ rPos).norm()) ); //tangential component of thrust
+		thrustVect = thrustVect*landerMass;
+
 	}
 
 }
@@ -81,7 +127,7 @@ void numerical_dynamics (void)
   // lander's pose. The time step is delta_t (global variable).
 {
 
-	double landerMass = UNLOADED_LANDER_MASS + fuel * FUEL_CAPACITY * FUEL_DENSITY;
+	landerMass = UNLOADED_LANDER_MASS + fuel * FUEL_CAPACITY * FUEL_DENSITY;
 	double landerArea = pow(LANDER_SIZE, 2.0) * M_PI;
 	double atmDensity = atmospheric_density(position);
 	vector3d totalFotrce = getGravity(position, landerMass, MARS_MASS) + getDrag(velocity, landerArea, atmDensity, DRAG_COEF_LANDER) + thrust_wrt_world();
@@ -131,12 +177,12 @@ void numerical_dynamics (void)
 	//if (stabilized_attitude) attitude_stabilization();
 	if (stabilized_attitude) {
 		attitude_stabilization();
-	}
-	if (orientLocked) {
-		vector3d axis = -(position^prevPosition).norm();
+		/*vector3d axis = -(position^prevPosition).norm();
 		double dPhi = acos(position.norm()*prevPosition.norm());
 		//printf("%f, %f, %f; %f\n", axis.x, axis.y, axis.z, dPhi);
-		rotateOrientation(dPhi, axis);
+		rotateOrientation(dPhi, axis);*/
+	}
+	if (orientLocked) {
 	}
 }
 
@@ -168,17 +214,19 @@ void initialize_simulation (void)
 
   case 0:
     // a circular equatorial orbit
-    position = vector3d(1.2*MARS_RADIUS, 0.0, 0.0);
-	//position = vector3d(0.0, 0.0, 1.2*MARS_RADIUS);
-    velocity = vector3d(0.0, -3247.087385863725, 0.0);
+    /*position = vector3d(1.2*MARS_RADIUS, 0.0, 0.0);
     orientation = vector3d(0.0, 90.0, 0.0);
-    //orientation = vector3d(0.0, 0.0, 0.0);
+    velocity = vector3d(0.0, 3247.087385863725, 0.0);*/
+    velocity = vector3d(-3247.087385863725, 0.0, 0.0);
+	position = vector3d(0.0, 0.0, 1.2*MARS_RADIUS);
+    orientation = vector3d(0.0, 0.0, 0.0);
     prevOrientation = orientation;
     delta_t = 0.1;
     prevPosition = position - velocity * delta_t;
     parachute_status = NOT_DEPLOYED;
     stabilized_attitude = false;
     autopilot_enabled = false;
+    mode = DESCENT;
     break;
 
   case 1:
@@ -192,6 +240,7 @@ void initialize_simulation (void)
     parachute_status = NOT_DEPLOYED;
     stabilized_attitude = true;
     autopilot_enabled = false;
+    mode = DESCENT;
     break;
 
   case 2:
@@ -205,6 +254,7 @@ void initialize_simulation (void)
     parachute_status = NOT_DEPLOYED;
     stabilized_attitude = false;
     autopilot_enabled = false;
+    mode = DESCENT;
     break;
 
   case 3:
@@ -218,6 +268,7 @@ void initialize_simulation (void)
     parachute_status = NOT_DEPLOYED;
     stabilized_attitude = false;
     autopilot_enabled = false;
+    mode = LAUNCH;
     break;
 
   case 4:
@@ -231,6 +282,7 @@ void initialize_simulation (void)
     parachute_status = NOT_DEPLOYED;
     stabilized_attitude = false;
     autopilot_enabled = false;
+    mode = DESCENT;
     break;
 
   case 5:
@@ -244,6 +296,7 @@ void initialize_simulation (void)
     parachute_status = NOT_DEPLOYED;
     stabilized_attitude = true;
     autopilot_enabled = false;
+    mode = DESCENT;
     break;
 
   case 6:
@@ -259,18 +312,33 @@ void initialize_simulation (void)
 	  parachute_status = NOT_DEPLOYED;
 	  stabilized_attitude = false;
 	  autopilot_enabled = false;
+	    mode = DESCENT;
     break;
 
   case 7:
+	    velocity = vector3d(0.0, -3247.087385863725, 0.0);
+		position = vector3d(0.0, 0.0, 1.2*MARS_RADIUS);
+	    orientation = vector3d(0.0, 0.0, 0.0);
+	    prevOrientation = orientation;
+	    delta_t = 0.1;
+	    prevPosition = position - velocity * delta_t;
+	    parachute_status = NOT_DEPLOYED;
+	    stabilized_attitude = false;
+	    autopilot_enabled = false;
+	    mode = DESCENT;
     break;
 
   case 8:
+
     break;
 
   case 9:
     break;
 
   }
+
+
+	targetPlane = targetPlane.norm();
 }
 
 vector3d getGravity(vector3d pos, double mass, double centreMass) {

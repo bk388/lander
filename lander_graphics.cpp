@@ -112,6 +112,18 @@ void dotMat(double m0[], double m1[], double mout[]) {
 	mout[13] = m0[1]*m1[12] + m0[5]*m1[13] + m0[9]*m1[14] + m0[13]*m1[15];
 	mout[14] = m0[2]*m1[12] + m0[6]*m1[13] + m0[10]*m1[14] + m0[14]*m1[15];
 	mout[15] = m0[3]*m1[12] + m0[7]*m1[13] + m0[11]*m1[14] + m0[15]*m1[15];
+	/*for (int ii = 0; ii < 4; ii++) {
+		for (int jj = 0; jj < 4; jj++) {
+			mout[ii + 4*jj] = 0.0;
+		}
+	}
+	for (int ii = 0; ii < 4; ii++) {
+		for (int jj = 0; jj < 4; jj++) {
+			for (int kk = 0; kk < 4; kk++) {
+				mout[ii + 4*jj] += m0[4*jj + kk] * m1[4*kk + ii];
+			}
+		}
+	}*/
 }
 
 void transpose(double m[], double mout[]) {
@@ -885,20 +897,22 @@ void display_help_text (void)
   glut_print(20, view_height-140, "Middle/shift mouse or up wheel - zoom in 3D views");
   glut_print(20, view_height-155, "Right mouse or down wheel - zoom out 3D views");
 
-  glut_print(20, view_height-175, "s - toggle attitude stabilizer");
-  glut_print(20, view_height-190, "p - deploy parachute");
-  glut_print(20, view_height-205, "a - toggle autopilot");
-  glut_print(20, view_height-220, "o - lock spacecraft relative orientation");
+  glut_print(20, view_height-175, "r - rotate counter-clockwise");
+  glut_print(20, view_height-190, "l - rotate clockwise");
+  glut_print(20, view_height-205, "s - toggle attitude stabilizer");
+  glut_print(20, view_height-220, "p - deploy parachute");
+  glut_print(20, view_height-235, "a - toggle autopilot");
+  //glut_print(20, view_height-220, "o - lock spacecraft relative orientation");
 
   //TODO
   /*glut_print(20, view_height-225, "l - toggle lighting model");
   glut_print(20, view_height-240, "t - toggle terrain texture");
   glut_print(20, view_height-255, "h - toggle help");
   glut_print(20, view_height-270, "Esc/q - quit");*/
-	glut_print(20, view_height-240, "l - toggle lighting model");
-	glut_print(20, view_height-255, "t - toggle terrain texture");
-	glut_print(20, view_height-270, "h - toggle help");
-	glut_print(20, view_height-285, "Esc/q - quit");
+	glut_print(20, view_height-270, "l - toggle lighting model");
+	glut_print(20, view_height-285, "t - toggle terrain texture");
+	glut_print(20, view_height-300, "h - toggle help");
+	glut_print(20, view_height-315, "Esc/q - quit");
 
   j = 0;
   for (i=0; i<10; i++) {
@@ -2176,6 +2190,7 @@ void glut_key (unsigned char k, int x, int y)
   }
 }
 
+static double prevOM1[16];
 void rotateOrientation(double dPhi, vector3d rotAxis) {
 	//TODO
 
@@ -2186,7 +2201,7 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 	double sinOZ;
 	double cosOZ;
 	double sinA;
-	double cosA;
+	double cosA; //TODO
 	vector3d zAxis = vector3d(0.0, 0.0, 1.0);
 	vector3d zxPlane = vector3d(0.0, 1.0, 0.0);
 	vector3d azPlane; //the plane defined by the axis of rotation and the z axis
@@ -2197,9 +2212,9 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 	}
 
 	xyz_euler_to_matrix(orientation, oM0);
+	rotAxis = rotAxis.norm();
 	cosOZ = rotAxis * zAxis;
 	sinOZ = (rotAxis ^ zAxis).abs();
-	rotAxis = rotAxis.norm();
 
 	if (sinOZ < SMALL_NUM && sinOZ > -SMALL_NUM) {
 	  rotM[0] = cos(dPhi);
@@ -2213,12 +2228,15 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 		  rotM[ii] = 0.0;
 	  }
 	} else {
-		azPlane = (zAxis ^ rotAxis).norm();
-		sinOZ = -(zAxis ^ rotAxis) * azPlane;
+		//printf("%f; %f; %f\n", (rotAxis^vector3d(0.0, 1.0, 0.0)).x, (rotAxis^vector3d(0.0, 1.0, 0.0)).y, (rotAxis^vector3d(0.0, 1.0, 0.0)).z);
+		azPlane = (zAxis ^ rotAxis).norm(); //TODO x
+		sinOZ = (zAxis ^ rotAxis).abs() * (rotAxis*zAxis >= 0 ? -1:1);
 		cosA = azPlane * zxPlane;
 		//sinA = (azPlane ^ zxPlane).abs();
 		sinA = (azPlane ^ zxPlane)*zAxis;
+		//printf("%f\n", sinOZ);
 		//rotate the orbit plane vector into the zx plane
+		//printf("%f\n\n", sinOZ);
 		rotM[0] = cosA;
 		rotM[1] = sinA;
 		rotM[4] = -sinA;
@@ -2244,6 +2262,10 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 		rotM[8] = 0.0;
 		rotM[10] = 1.0;
 		dotMat(rotM, oM0, oM1);
+		/*printMatrix(rotM);
+		printMatrix(oM1);
+		printMatrix(oM0);
+		printf("%f \n\n\n", dPhi);*/
 		//undo the transformation of the orbit plane
 		rotM[0] = cosOZ;
 		rotM[1] = 0.0;
@@ -2263,10 +2285,39 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 		rotM[10] = 1.0;
 		rotM[15] = 1.0;
 		dotMat(rotM, oM0, oM1);
-
 	}
 
 	orientation = matrix_to_xyz_euler(oM1);
+	/*if (!cmpMat(oM1, prevOM1)) {
+		printMatrix(oM1);
+		//printMatrix(prevOM1);
+	}
+	if ( ((vector3d(oM1[0], oM1[1], oM1[2])^vector3d(oM1[4], oM1[5], oM1[6])) - vector3d(oM1[8], oM1[9], oM1[10])).abs() > SMALL_NUM && !cmpMat(oM1, prevOM1)) {
+		printMatrix(oM1);
+		printMatrix(prevOM1);
+		printf("found");
+	}
+	for (int ii = 0; ii < 16; ii ++) {
+		prevOM1[ii] = oM1[ii];
+	}*/
+}
+
+void printMatrix(double m[]) {
+	printf("%f, %f, %f %f\n", m[0], m[4], m[8], m[12]);
+	printf("%f, %f, %f %f\n", m[1], m[5], m[9], m[13]);
+	printf("%f, %f, %f %f\n", m[2], m[6], m[10], m[14]);
+	printf("%f, %f, %f %f\n\n", m[3], m[7], m[11], m[15]);
+}
+
+bool cmpMat(double m0[], double m1[]) {
+	bool same = true;
+	for (int ii = 0; ii < 16; ii ++) {
+		if (abs(m0[ii] - m1[ii]) > 2*SMALL_NUM) {
+			same = false;
+			break;
+		}
+	}
+	return same;
 }
 
 int main (int argc, char* argv[])

@@ -1,0 +1,41 @@
+19:06:31 **** Build of configuration Default for project lander ****
+make all 
+/bin/sh: 2: g++: not found
+Linking for Linux
+19:09:03 **** Incremental Build of configuration Default for project lander ****
+make all 
+/bin/sh: 2: g++: not found
+Linking for Linux
+19:10:12 **** Incremental Build of configuration Default for project lander ****
+make all 
+Linking for Linux
+19:10:17 **** Incremental Build of configuration Default for project lander ****
+make all 
+make: Nothing to be done for 'all'.
+19:14:11 **** Incremental Build of configuration Default for project lander ****
+make all 
+make: Nothing to be done for 'all'.
+19:14:25 **** Clean-only build of configuration Default for project lander ****
+make clean 
+echo cleaning up; /bin/rm -f core *.o lander spring
+cleaning up
+19:14:28 **** Build of configuration Default for project lander ****
+make all 
+g++ -O3 -Wno-deprecated-declarations -c lander.cpp
+g++ -O3 -Wno-deprecated-declarations -c lander_graphics.cpp
+Linking for Linux
+g++ -O3 -Wno-deprecated-declarations -c spring.cpp
+g++   spring.o   -o spring
+19:15:55 **** Incremental Build of configuration Default for project lander ****
+make all 
+make: Nothing to be done for 'all'.
+19:16:08 **** Incremental Build of configuration Default for project lander ****
+make all 
+make: Nothing to be done for 'all'.
+19:16:24 **** Incremental Build of configuration Default for project lander ****
+make all 
+Linking for Linux
+g++   spring.o   -o spring
+19:16:30 **** Incremental Build of configuration Default for project lander ****
+make all 
+make: Nothing to be done for 'all'.

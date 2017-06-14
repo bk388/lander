@@ -74,7 +74,7 @@
 #define LANDER_SIZE 1.0 // (m)
 #define UNLOADED_LANDER_MASS 100.0 // (kg)
 #define FUEL_CAPACITY 100.0 // (l)
-#define FUEL_RATE_AT_MAX_THRUST 0.5 // (l/s) TODO
+#define FUEL_RATE_AT_MAX_THRUST 0.0 // (l/s) TODO
 #define FUEL_DENSITY 1.0 // (kg/l)
 // MAX_THRUST, as defined below, is 1.5 * weight of fully loaded lander at surface
 #define MAX_THRUST (1.5 * (FUEL_DENSITY*FUEL_CAPACITY+UNLOADED_LANDER_MASS) * (GRAVITY*MARS_MASS/(MARS_RADIUS*MARS_RADIUS))) // (N)
@@ -257,3 +257,5 @@ void glut_key (unsigned char k, int x, int y);
 void dotMat(double m0[], double m1[], double mout[]);
 void transpose(double m[], double mout[]);
 void rotateOrientation(double dPhi, vector3d axis);
+void printMatrix(double m[]);
+bool cmpMat(double m0[], double m1[]);
