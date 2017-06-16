@@ -126,6 +126,14 @@ void dotMat(double m0[], double m1[], double mout[]) {
 	}*/
 }
 
+vector3d matDotVect(vector3d vect, double m[]) {
+	vector3d out;
+	out.x = vect.x * m[0] + vect.y * m[4] + vect.z * m[8];
+	out.y = vect.x * m[1] + vect.y * m[5] + vect.z * m[9];
+	out.z = vect.x * m[2] + vect.y * m[6] + vect.z * m[10];
+	return out;
+}
+
 void transpose(double m[], double mout[]) {
 	for (int ii = 0; ii < 4; ii ++) {
 		for (int jj = 0; jj < 4; jj ++) {
@@ -1709,7 +1717,7 @@ vector3d thrust_wrt_world (void)
     last_time_lag_updated = simulation_time;
   }
 
-  if (stabilized_attitude && (stabilized_attitude_angle == 0)) { // specific solution, avoids rounding errors in the more general calculation below
+  /*if (stabilized_attitude && (stabilized_attitude_angle == 0)) { // specific solution, avoids rounding errors in the more general calculation below
     b = lagged_throttle*MAX_THRUST*position.norm();
   } else {
     a.x = 0.0; a.y = 0.0; a.z = lagged_throttle*MAX_THRUST;
@@ -1717,7 +1725,16 @@ vector3d thrust_wrt_world (void)
     b.x = m[0]*a.x + m[4]*a.y + m[8]*a.z;
     b.y = m[1]*a.x + m[5]*a.y + m[9]*a.z;
     b.z = m[2]*a.x + m[6]*a.y + m[10]*a.z;
-  }
+  }*/ //I am not using the stabilized_attitude_angle
+  if (stabilized_attitude && (abs(relativeAttitude.x) < SMALL_NUM && abs(relativeAttitude.y) < SMALL_NUM && abs(relativeAttitude.z) < SMALL_NUM)) { // specific solution, avoids rounding errors in the more general calculation below
+      b = lagged_throttle*MAX_THRUST*position.norm();
+    } else {
+      a.x = 0.0; a.y = 0.0; a.z = lagged_throttle*MAX_THRUST;
+      xyz_euler_to_matrix(orientation, m);
+      b.x = m[0]*a.x + m[4]*a.y + m[8]*a.z;
+      b.y = m[1]*a.x + m[5]*a.y + m[9]*a.z;
+      b.z = m[2]*a.x + m[6]*a.y + m[10]*a.z;
+    }//TODO
   return b;
 }
 
@@ -2152,6 +2169,7 @@ void glut_key (unsigned char k, int x, int y)
   case 's': case 'S':
     // s or S - attitude stabilizer
     if (!autopilot_enabled && !landed) stabilized_attitude = !stabilized_attitude;
+    relativeAttitude = vector3d(0.0, 0.0, 0.0);
     if (paused) refresh_all_subwindows();
     break;
 
@@ -2159,14 +2177,16 @@ void glut_key (unsigned char k, int x, int y)
   case 'r': case 'R':
 	  //printf("%f; %f; %f\n", orbitPlane.x, orbitPlane.y, orbitPlane.z);
 	  if (!autopilot_enabled && !landed) {
-		  rotateOrientation(dPhi, orbitPlane);
+		  orientation = rotateXYZEuler(orientation, dPhi, orbitPlane);
+		  relativeAttitude = rotateXYZEuler(relativeAttitude, dPhi, orbitPlane);
 	  }
 	  if (paused) refresh_all_subwindows();
 	  break;
 
   case 'f': case 'F':
 	  if (!autopilot_enabled && !landed) {
-		  rotateOrientation(-dPhi, orbitPlane);
+		  orientation = rotateXYZEuler(orientation, -dPhi, orbitPlane);
+		  relativeAttitude = rotateXYZEuler(relativeAttitude, -dPhi, orbitPlane);
 	  }
 	  if (paused) refresh_all_subwindows();
 	  break;
@@ -2191,7 +2211,7 @@ void glut_key (unsigned char k, int x, int y)
 }
 
 static double prevOM1[16];
-void rotateOrientation(double dPhi, vector3d rotAxis) {
+vector3d rotateXYZEuler(vector3d attitude, double dPhi, vector3d rotAxis) {
 	//TODO
 
 	//source: http://inside.mines.edu/fs_home/gmurray/ArbitraryAxisRotation/
@@ -2211,7 +2231,7 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 	  rotM[ii] = 0;
 	}
 
-	xyz_euler_to_matrix(orientation, oM0);
+	xyz_euler_to_matrix(attitude, oM0);
 	rotAxis = rotAxis.norm();
 	cosOZ = rotAxis * zAxis;
 	sinOZ = (rotAxis ^ zAxis).abs();
@@ -2287,7 +2307,8 @@ void rotateOrientation(double dPhi, vector3d rotAxis) {
 		dotMat(rotM, oM0, oM1);
 	}
 
-	orientation = matrix_to_xyz_euler(oM1);
+	attitude = matrix_to_xyz_euler(oM1);
+	return attitude;
 	/*if (!cmpMat(oM1, prevOM1)) {
 		printMatrix(oM1);
 		//printMatrix(prevOM1);

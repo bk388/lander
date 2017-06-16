@@ -171,7 +171,7 @@ unsigned long long time_program_started;
 
 // Lander state - the visualization routines use velocity_from_positions, so not sensitive to 
 // any errors in the velocity update in numerical_dynamics
-vector3d position, orientation, velocity, velocity_from_positions, last_position;
+vector3d position, orientation, velocity, velocity_from_positions, last_position, relativeAttitude;//TODO
 double climb_speed, ground_speed, altitude, throttle, fuel;
 bool stabilized_attitude, autopilot_enabled, parachute_lost, orientLocked; //TODO
 parachute_status_t parachute_status;
@@ -194,7 +194,7 @@ extern bool stabilized_attitude, autopilot_enabled, orientLocked; //TODO
 extern double delta_t, simulation_time, throttle, fuel;
 extern unsigned short scenario;
 extern string scenario_description[];
-extern vector3d position, orientation, velocity;
+extern vector3d position, orientation, velocity, relativeAttitude;
 extern parachute_status_t parachute_status;
 extern int stabilized_attitude_angle;
 
@@ -256,6 +256,7 @@ void glut_key (unsigned char k, int x, int y);
 //TODO my functions
 void dotMat(double m0[], double m1[], double mout[]);
 void transpose(double m[], double mout[]);
-void rotateOrientation(double dPhi, vector3d axis);
+vector3d rotateXYZEuler(vector3d attitude, double dPhi, vector3d axis);
 void printMatrix(double m[]);
 bool cmpMat(double m0[], double m1[]);
+vector3d matDotVect(vector3d vect, double m[]);
