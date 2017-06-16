@@ -24,14 +24,16 @@ double minRadius;
 double maxRadius;
 
 //control constants for orbital injection
-const double vn0 = -1.0;
-const double vtg0 = 1;
-const double vr0 = 1;
+const double vn0 = -5.0;
+const double vtg0 = -0.1;
+const double vr0 = 0.01;
 const double vtgSlope = 1;
 const double vrSlope = 1;
-const double kn = 1;
-const double kr = 1;
+const double kn = 0.01;
+const double kr = 1.0;
 const double ktg = 1;
+const double k1 = 2E-3;
+const double k2 = 10.0;
 //control variables
 /*double vn;
 double vtg;
@@ -40,7 +42,8 @@ double vnTarget;
 double vtgTarget;
 double vrTarget;*/
 double vmax;
-vector3d thrustVect;
+vector3d targetVelocity;
+vector3d throttleVect;
 vector3d rPos;
 vector3d nPos;
 
@@ -107,16 +110,30 @@ void autopilot (void)
 		}
 	} else if (mode == LAUNCH) {
 		landerMass = UNLOADED_LANDER_MASS + fuel * FUEL_CAPACITY * FUEL_DENSITY;
-		rPos = (targetPlane ^ position) ^ targetPlane; // component of the position in the orbit plane
-		nPos = (targetPlane * position) * targetPlane; // component of the position normal to the orbit plane (distance from orbit plane)
+				rPos = (targetPlane ^ position) ^ targetPlane; // component of the position in the orbit plane
+				nPos = (targetPlane * position) * targetPlane; // component of the position normal to the orbit plane (distance from orbit plane)
 
-		//calculating the max velocity from the orbit parameters
-		vmax = 2.0*GRAVITY*MARS_MASS*maxRadius/(minRadius*(minRadius + maxRadius));
+				//calculating the max velocity from the orbit parameters
+				vmax = pow(2.0*GRAVITY*MARS_MASS*maxRadius/(minRadius*(minRadius + maxRadius)), 0.5);
 
-		thrustVect = targetPlane*kn * ( nPos.abs()*vn0 - (targetPlane*velocity) ) //normal component of thrust
-					+ kr * ((minRadius*rPos.norm() - rPos)*vr0 - (rPos.norm()*velocity)*rPos.norm()) //radial component of thrust
-					+ ktg*(targetPlane ^ rPos).norm() * ( (vmax - velocity*(targetPlane ^ rPos).norm()) ); //tangential component of thrust
-		thrustVect = thrustVect*landerMass;
+				//throttleVect = kr * (vr0*(rPos.norm()*minRadius - rPos)/minRadius - (velocity*rPos.norm())*rPos.norm()); //normal component of thrust
+				/*throttleVect = kr * ((velocity * rPos.norm())*rPos.norm() - vr0 * (rPos.norm()*minRadius - rPos).norm()/(rPos.abs()-MARS_RADIUS));
+				throttleVect = throttleVect*landerMass ;*/
+				throttleVect = throttleVect/landerMass;
+				//throttleVect += (rPos - rPos.norm()*minRadius)*(rPos - rPos.norm()*minRadius).abs() * k1 + velocity * k2;
+				/*if ((rPos.norm()*minRadius - rPos).abs()>0.1) {
+					throttleVect += (rPos - rPos.norm()*(minRadius+46))*(rPos - rPos.norm()*(minRadius+46)).abs() * k1
+							+ k2 * (velocity - (rPos.norm()*(minRadius+46) - rPos)*vr0);
+				} else {
+					printf("altitude below target: %f\n", rPos.abs() - minRadius);
+					throttleVect += (rPos - rPos.norm()*(minRadius)) * k1;
+				}*/
+				//throttleVect += ( (rPos - rPos.norm()*(minRadius+45)) * k1 + k2 * (velocity - (rPos.norm()*(minRadius+45) - rPos)*vr0) )*delta_t;
+				throttleVect += ( (position - position.norm()*minRadius)*k1 + (velocity - (position.norm()*minRadius - position)*vr0)*k2 ) * delta_t;
+				printf("%f\n", rPos.abs() - minRadius);
+
+				attitude_stabilization(-throttleVect);
+				throttle = throttleVect.abs();
 
 	}
 
@@ -144,32 +161,6 @@ void numerical_dynamics (void)
 
 	velocity = velocity + acceleration * delta_t;
 
-	//the spacecraft has moment of inertia
-	//TODO does not work
-	/*xyz_euler_to_matrix(orientation, oMat);
-	xyz_euler_to_matrix(prevOrientation, prevOMat);
-	invert(prevOMat, invPrevOMat);
-	dotMat(oMat, invPrevOMat, rotMat);
-	dotMat(rotMat, oMat, nextOMat);
-	prevOrientation = orientation;
-	orientation = matrix_to_xyz_euler(nextOMat);*/
-	/*xyz_euler_to_matrix(orientation, oMat);
-	xyz_euler_to_matrix(prevOrientation, prevOMat);
-	invert(prevOMat, invPrevOMat);
-	dotMat(oMat, invPrevOMat, rotMat);
-	double theta = acos((rotMat[0] + rotMat[5] + rotMat[10] - 1)/2);
-	transpose(rotMat, rotMatT);
-	for (int ii = 0; ii < 16; ii ++) {
-		rotMat[ii] -= rotMatT[ii];
-		rotMat[ii] *= theta;
-		rotMat[ii] /= sin(theta)*2*delta_t;
-	}
-	omega = vector3d(rotMat[6], rotMat[1], rotMat[12]);
-
-	if (omega.abs() > SMALL_NUM) {
-		rotateOrientation(omega.abs()*delta_t, omega.norm());
-	}*/
-
 	// Here we can apply an autopilot to adjust the thrust, parachute and attitude
 	if (autopilot_enabled) autopilot();
 
@@ -177,10 +168,6 @@ void numerical_dynamics (void)
 	//if (stabilized_attitude) attitude_stabilization();
 	if (stabilized_attitude) {
 		attitude_stabilization();
-		/*vector3d axis = -(position^prevPosition).norm();
-		double dPhi = acos(position.norm()*prevPosition.norm());
-		//printf("%f, %f, %f; %f\n", axis.x, axis.y, axis.z, dPhi);
-		rotateOrientation(dPhi, axis);*/
 	}
 	if (orientLocked) {
 	}
@@ -259,16 +246,19 @@ void initialize_simulation (void)
 
   case 3:
     // polar surface launch at escape velocity (but drag prevents escape)
-    position = vector3d(0.0, 0.0, MARS_RADIUS + LANDER_SIZE/2.0);
+    /*position = vector3d(0.0, 0.0, MARS_RADIUS + LANDER_SIZE/2.0);
     velocity = vector3d(0.0, 0.0, 5027.0);
-    orientation = vector3d(0.0, 0.0, 0.0);
+    orientation = vector3d(0.0, 0.0, 0.0);*/
+	position = vector3d(MARS_RADIUS + LANDER_SIZE/2.0, 0.0, 0.0);
+    velocity = vector3d(5027.0, 0.0, 0.0);
+    orientation = vector3d(0.0, 90.0, 0.0);
     prevOrientation = orientation;
     delta_t = 0.1;
     prevPosition = position - velocity * delta_t;
     parachute_status = NOT_DEPLOYED;
     stabilized_attitude = false;
     autopilot_enabled = false;
-    mode = LAUNCH;
+    mode = DESCENT;
     break;
 
   case 4:
@@ -329,16 +319,31 @@ void initialize_simulation (void)
     break;
 
   case 8:
-
+	  //injection into orbit
+	  mode = LAUNCH;
+	  minRadius = 1.2*MARS_RADIUS;
+	  maxRadius = 1.2*MARS_RADIUS;
+	  printf("%f\n", 1.2*MARS_RADIUS);
+	  targetPlane = vector3d(0.0, 1.0, 0.0);
+	  stabilized_attitude = false;
+	  autopilot_enabled = true;
     break;
 
   case 9:
+	  //injection into orbit
+	  mode = LAUNCH;
+	  minRadius = (MARS_RADIUS + 10000.0);
+	  maxRadius = (MARS_RADIUS + 10000.0);
+	  targetPlane = vector3d(0.0, 0.0, 1.0);
+	  stabilized_attitude = false;
+	  autopilot_enabled = true;
     break;
 
   }
 
 
 	targetPlane = targetPlane.norm();
+	throttleVect = vector3d(0.0, 0.0, 0.0);
 }
 
 vector3d getGravity(vector3d pos, double mass, double centreMass) {
